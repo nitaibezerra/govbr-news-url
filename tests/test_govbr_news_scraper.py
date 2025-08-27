@@ -48,33 +48,51 @@ class TestNewsLinkScraper:
         absolute_url = "https://other.gov.br/noticias"
         result = scraper._convert_to_absolute_url(absolute_url, base_url)
         assert result == absolute_url
-        
+
     def test_find_links_by_text(self, scraper):
-        """Test finding links by exact text match."""
+        """Test finding links with prioritized text matching."""
         html = """
         <div>
-            <a href="/news">Notícias</a>
+            <a href="/exact">Notícias</a>
             <a href="/contact">Contato</a>
-            <a href="/more">Mais Notícias</a>
-            <a href="/5g">Notícias 5G</a>
+            <a href="/ends_with">Principais Notícias</a>
+            <a href="/starts_with">Notícias 5G</a>
+            <a href="/starts_with2">Notícias Siscomex</a>
         </div>
         """
         soup = BeautifulSoup(html, 'html.parser')
-        
-        # Test exact match for "notícias" - should only find "Notícias", not "Mais Notícias" or "Notícias 5G"
+
+        # Test prioritized matching for "notícias"
+        # Should prioritize exact match "Notícias" over others
         links = scraper._find_links_by_text(soup, "notícias")
         assert len(links) == 1
-        assert links[0].get('href') == '/news'
-        
-        # Test exact match for "mais notícias"
-        links = scraper._find_links_by_text(soup, "mais notícias")
+        assert links[0].get('href') == '/exact'
+
+        # Test when no exact match exists - should get "ends with" match
+        html_no_exact = """
+        <div>
+            <a href="/contact">Contato</a>
+            <a href="/ends_with">Principais Notícias</a>
+            <a href="/starts_with">Notícias 5G</a>
+        </div>
+        """
+        soup_no_exact = BeautifulSoup(html_no_exact, 'html.parser')
+        links = scraper._find_links_by_text(soup_no_exact, "notícias")
         assert len(links) == 1
-        assert links[0].get('href') == '/more'
-        
-        # Test exact match for "notícias 5g"
-        links = scraper._find_links_by_text(soup, "notícias 5g")
-        assert len(links) == 1
-        assert links[0].get('href') == '/5g'
+        assert links[0].get('href') == '/ends_with'
+
+        # Test when only "starts with" matches exist
+        html_starts_only = """
+        <div>
+            <a href="/contact">Contato</a>
+            <a href="/starts_with">Notícias 5G</a>
+            <a href="/starts_with2">Notícias Siscomex</a>
+        </div>
+        """
+        soup_starts_only = BeautifulSoup(html_starts_only, 'html.parser')
+        links = scraper._find_links_by_text(soup_starts_only, "notícias")
+        assert len(links) >= 1  # Should get at least one "starts with" match
+        assert links[0].get('href') in ['/starts_with', '/starts_with2']
 
     def test_extract_link_url(self, scraper):
         """Test extracting URL from link tag."""

@@ -120,30 +120,47 @@ class NewsLinkScraper:
     def _find_links_by_text(self, soup: BeautifulSoup, search_text: str,
                            container: Optional[Tag] = None) -> List[Tag]:
         """
-        Find links with exact text match (case insensitive, trimmed).
+        Find links with intelligent text matching (prioritizes exact matches).
 
         Args:
             soup: BeautifulSoup object to search in
-            search_text: Text to search for in link text (exact match)
+            search_text: Text to search for in link text
             container: Optional container to limit search scope
 
         Returns:
-            List of link tags with exact text match
+            List of link tags with prioritized matching
         """
         search_container = container or soup
         search_text_clean = search_text.lower().strip()
-        matched_links = []
-
-        # Search all links for exact text match
         all_links = search_container.find_all('a')
+
+        exact_matches = []
+        ends_with_matches = []
+        starts_with_matches = []
+
         for link in all_links:
             if link.text:
                 link_text_clean = link.text.lower().strip()
-                # Exact match comparison
-                if link_text_clean == search_text_clean:
-                    matched_links.append(link)
 
-        return matched_links
+                # Priority 1: Exact match (e.g., "notícias")
+                if link_text_clean == search_text_clean:
+                    exact_matches.append(link)
+                # Priority 2: Ends with search text (e.g., "principais notícias")
+                elif link_text_clean.endswith(search_text_clean):
+                    ends_with_matches.append(link)
+                # Priority 3: Starts with search text (e.g., "notícias siscomex")
+                elif link_text_clean.startswith(search_text_clean):
+                    starts_with_matches.append(link)
+
+        # Return in order of priority
+        if exact_matches:
+            return exact_matches
+        elif ends_with_matches:
+            return ends_with_matches
+        elif starts_with_matches:
+            return starts_with_matches
+        else:
+            return []
 
     def _extract_link_url(self, link: Tag, base_url: str) -> Optional[str]:
         """
