@@ -106,7 +106,7 @@ def sample_csv_data():
         ],
         'Órgão ou Entidade': [
             'Ministério A',
-            'Ministério B', 
+            'Ministério B',
             'Ministério C'
         ]
     })
