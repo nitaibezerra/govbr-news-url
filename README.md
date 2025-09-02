@@ -62,7 +62,7 @@ python main.py scrape
 - Extrai URLs de notícias usando 4 estratégias inteligentes:
   1. **Rodapé**: "Notícias" em `<div class="footer-wrapper">`
   2. **Fallback 1**: "Últimas Notícias" em toda a página
-  3. **Fallback 2**: "Mais Notícias" em toda a página  
+  3. **Fallback 2**: "Mais Notícias" em toda a página
   4. **Fallback 3**: "Notícias" genérico (com filtros anti-promocionais)
 - Salva resultados em `data/stage/scraped_urls.csv`
 
@@ -134,7 +134,7 @@ O sistema usa um algoritmo de pontuação para escolher o melhor link quando mú
 ```python
 # Priorização automática:
 # 🏆 Links com 'comunicacao' no URL: +100 pontos
-# 🥈 Texto "Últimas Notícias": +50 pontos  
+# 🥈 Texto "Últimas Notícias": +50 pontos
 # 🥉 Caminhos mais curtos: +10 pontos
 # 💡 URLs com 'noticias': +5 pontos
 ```
@@ -145,7 +145,7 @@ Busca por links usando prioridades:
 ```python
 # Ordem de prioridade:
 # 1. 🎯 Correspondência exata: "Notícias"
-# 2. 🔚 Termina com: "Principais Notícias" 
+# 2. 🔚 Termina com: "Principais Notícias"
 # 3. 🔜 Começa com: "Notícias Siscomex"
 ```
 
@@ -219,7 +219,7 @@ from src.scraper import NewsLinkScraper
 
 scraper = NewsLinkScraper(
     request_timeout=30,     # Timeout das requisições (segundos)
-    request_delay=2.0,      # Delay entre requisições (segundos)  
+    request_delay=2.0,      # Delay entre requisições (segundos)
     user_agent="Custom-Bot/1.0"  # User agent customizado
 )
 ```
@@ -252,7 +252,7 @@ ImportError: cannot import name 'NewsLinkScraper'
 
 ### **Taxa de sucesso baixa**
 - ✅ Verifique conectividade de rede
-- ✅ Alguns sites podem estar temporariamente indisponíveis  
+- ✅ Alguns sites podem estar temporariamente indisponíveis
 - ✅ Confirme se os padrões HTML não mudaram
 
 ### **Timeout em sites específicos**
@@ -310,7 +310,7 @@ Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalh
 
 ### **v1.1** (Melhorias Atuais)
 - [x] ✅ Arquitetura modular
-- [x] ✅ Interface CLI profissional  
+- [x] ✅ Interface CLI profissional
 - [x] ✅ Validação inteligente de URLs
 - [x] ✅ Pipeline automatizado completo
 

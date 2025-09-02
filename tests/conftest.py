@@ -5,7 +5,6 @@ import tempfile
 import os
 from unittest.mock import Mock
 import pandas as pd
-from bs4 import BeautifulSoup
 
 
 @pytest.fixture
