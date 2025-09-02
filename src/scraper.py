@@ -10,7 +10,7 @@ import logging
 import os
 import time
 from typing import List, Optional, Tuple
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import pandas as pd
 import requests
@@ -181,7 +181,7 @@ class NewsLinkScraper:
 
     def _search_footer_news_links(self, soup: BeautifulSoup, url: str) -> Optional[str]:
         """
-        Search for news links in the footer section.
+        Search for news links in the footer section with intelligent selection.
 
         Args:
             soup: Parsed HTML content
@@ -199,12 +199,68 @@ class NewsLinkScraper:
         news_links = self._find_links_by_text(soup, 'notícias', footer_div)
 
         if news_links:
-            link_url = self._extract_link_url(news_links[0], url)
+            # Se há múltiplos links, usar lógica inteligente de seleção
+            if len(news_links) > 1:
+                selected_link = self._select_best_news_link(news_links, url)
+            else:
+                selected_link = news_links[0]
+
+            link_url = self._extract_link_url(selected_link, url)
             if link_url:
                 self.logger.info(f"Link de notícias encontrado no rodapé de {url}: {link_url}")
                 return link_url
 
         return None
+
+    def _select_best_news_link(self, links: List[Tag], base_url: str) -> Tag:
+        """
+        Select the best news link from multiple options using intelligent criteria.
+
+        Prioritizes links based on URL patterns and context:
+        1. Links containing 'comunicacao' (communication-related)
+        2. Links containing 'noticias' in path
+        3. Shorter, more direct paths
+        4. First found as fallback
+
+        Args:
+            links: List of link tags to choose from
+            base_url: Base URL for analysis
+
+        Returns:
+            The best link tag
+        """
+        scored_links = []
+
+        for link in links:
+            href = link.get('href', '')
+            text = link.get_text(strip=True).lower()
+            score = 0
+
+            if href:
+                absolute_url = self._convert_to_absolute_url(href, base_url)
+
+                # Scoring criteria
+                if 'comunicacao' in absolute_url.lower():
+                    score += 100  # High priority for communication links
+                if 'ultimas' in text:
+                    score += 50   # Priority for "últimas notícias"
+                if absolute_url.count('/') <= 6:  # Prefer shorter paths
+                    score += 10
+                if 'noticias' in absolute_url.lower():
+                    score += 5
+
+                scored_links.append((score, link))
+
+        # Sort by score (highest first) and return best
+        scored_links.sort(key=lambda x: x[0], reverse=True)
+
+        if scored_links:
+            best_score, best_link = scored_links[0]
+            self.logger.info(f"Selecionado link com score {best_score}: {best_link.get_text(strip=True)}")
+            return best_link
+
+        # Fallback to first link if scoring fails
+        return links[0]
 
     def _search_more_news_links(self, soup: BeautifulSoup, url: str) -> Optional[str]:
         """
@@ -252,14 +308,59 @@ class NewsLinkScraper:
 
         return None
 
+    def _search_generic_news_links(self, soup: BeautifulSoup, url: str) -> Optional[str]:
+        """
+        Search for generic "Notícias" links throughout the page as final fallback.
+
+        Args:
+            soup: Parsed HTML content
+            url: Base URL for converting relative links
+
+        Returns:
+            News link URL if found, None otherwise
+        """
+        self.logger.info(f"Tentando fallback final: procurando 'Notícias' genérico em toda a página de {url}")
+
+        # Use intelligent matching to avoid specific/promotional news links
+        news_links = self._find_links_by_text(soup, 'notícias')
+
+        if news_links:
+            # Filter out obviously promotional or specific links
+            filtered_links = []
+            for link in news_links:
+                href = link.get('href', '')
+                text = link.get_text(strip=True).lower()
+
+                # Skip overly specific or promotional links
+                skip_patterns = ['g20', 'evento', 'campanha', 'especial', 'promocao']
+                if not any(pattern in text or pattern in href.lower() for pattern in skip_patterns):
+                    filtered_links.append(link)
+
+            # Use filtered links if available, otherwise use original
+            target_links = filtered_links if filtered_links else news_links
+
+            # Select best from available options
+            if len(target_links) > 1:
+                selected_link = self._select_best_news_link(target_links, url)
+            else:
+                selected_link = target_links[0]
+
+            link_url = self._extract_link_url(selected_link, url)
+            if link_url:
+                self.logger.info(f"Link genérico de notícias encontrado em {url}: {link_url}")
+                return link_url
+
+        return None
+
     def find_news_link(self, url: str) -> str:
         """
         Find a news link for a given website using multiple strategies.
 
-        This method implements a three-level fallback strategy:
+        This method implements a multi-level fallback strategy with improved prioritization:
         1. Search for "Notícias" in footer
-        2. Search for "Mais Notícias" in entire page
-        3. Search for "Últimas Notícias" in entire page
+        2. Search for "Últimas Notícias" in entire page (higher priority than generic)
+        3. Search for "Mais Notícias" in entire page
+        4. Search for "Notícias" in entire page (broader fallback)
 
         Args:
             url: The website URL to search for news links
@@ -276,23 +377,28 @@ class NewsLinkScraper:
         if news_link:
             return news_link
 
-        # Strategy 2: "Mais Notícias" fallback
+        # Strategy 2: "Últimas Notícias" fallback (prioritized for better relevance)
+        news_link = self._search_latest_news_links(soup, url)
+        if news_link:
+            return news_link
+
+        # Strategy 3: "Mais Notícias" fallback
         news_link = self._search_more_news_links(soup, url)
         if news_link:
             return news_link
 
-        # Strategy 3: "Últimas Notícias" fallback
-        news_link = self._search_latest_news_links(soup, url)
+        # Strategy 4: Generic "Notícias" fallback (last resort)
+        news_link = self._search_generic_news_links(soup, url)
         if news_link:
             return news_link
 
         self.logger.info(
             f"Nenhum link de notícias encontrado em {url} "
-            "(nem no rodapé, nem 'Mais Notícias', nem 'Últimas Notícias')"
+            "(nenhuma estratégia foi bem-sucedida)"
         )
         return ""
 
-    def process_csv_file(self, input_file: str, output_file: str,
+    def scrape_from_csv(self, input_file: str, output_file: str,
                         portal_column: str = 'Portal',
                         news_column: str = 'Noticias') -> Tuple[int, int]:
         """
@@ -362,7 +468,7 @@ class NewsLinkScraper:
         success_rate = (sites_with_news / total_sites) * 100
 
         self.logger.info(f"Processamento concluído! Resultado salvo em {output_file}")
-        self.logger.info(f"ESTATÍSTICAS FINAIS:")
+        self.logger.info("ESTATÍSTICAS FINAIS:")
         self.logger.info(f"Total de sites: {total_sites}")
         self.logger.info(f"Sites com links de notícias: {sites_with_news}")
         self.logger.info(f"Sites sem notícias: {sites_without_news}")
@@ -384,7 +490,7 @@ def main() -> None:
 
     try:
         total_sites, sites_with_news = scraper.process_csv_file(input_file, output_file)
-        print(f"\n✅ Processamento concluído!")
+        print("\n✅ Processamento concluído!")
         print(f"📊 {sites_with_news}/{total_sites} sites com links de notícias")
         print(f"📈 Taxa de sucesso: {(sites_with_news/total_sites)*100:.1f}%")
 
@@ -393,5 +499,3 @@ def main() -> None:
         raise
 
 
-if __name__ == "__main__":
-    main()

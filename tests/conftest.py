@@ -5,7 +5,6 @@ import tempfile
 import os
 from unittest.mock import Mock
 import pandas as pd
-from bs4 import BeautifulSoup
 
 
 @pytest.fixture
@@ -106,7 +105,7 @@ def sample_csv_data():
         ],
         'Órgão ou Entidade': [
             'Ministério A',
-            'Ministério B', 
+            'Ministério B',
             'Ministério C'
         ]
     })
